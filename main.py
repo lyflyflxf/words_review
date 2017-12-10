@@ -6,129 +6,148 @@
 #     day_list.append(sum(inter[:i]))
 # print(day_list)
 
-import openpyxl
 from datetime import *
-import os
 import pyperclip
+import pandas as pd
+from pdb import set_trace as st
+import numpy as np
 
+# review_day = [1, 3, 7, 14, 29, 59]
 interval = [1, 2, 4, 7, 15, 30]
-review_day = [1, 3, 7, 14, 29, 59]
+inter_l = len(interval)
 
-f_dir = r"E:\py\tools\s_plan\\"
-f_name = 't.xlsx'
-wb = openpyxl.load_workbook(f_dir + f_name)
+# f_dir = r"E:\py\tools\s_plan\\"
+# f_name = 't.xlsx'
+dir = r"E:\py\tools\s_plan\t.xlsx"
 
+init = '初次背诵日期'
+content = '内容'
+count = '已复习次数'
+last = '上次复习日期'
+next = '下次复习日期'
+dl = 'deadline'
+sn = '序号'
+erase = [last, next, dl]
 
-# wb.template=False
-
-class Record:
-    GENERAL = 'General'
-    DATE = 'yyyy/m/d'
-
-    def r_value(self,column):
-        return sheet.cell(None, self.row, column).value
-
-    def w_value(self,column, value, format=GENERAL):
-        cell = sheet.cell(None, self.row, column)
-        cell.value = value
-        cell.number_format = format
-
-    # def update(self):
+now = pd.Timestamp(date.today())
 
 
-    def __init__(self, name, row):
-        self.name = name
-        self.row = row
-        sheet = wb.get_sheet_by_name(name)
-
-        def future(sn):
-            if not (isinstance(sn, int) and sn >= 0):
-                raise ValueError('复习次数序号不是自然数')
-            l = len(interval)
-            if sn < l:
-                return interval[sn]
-            else:
-                return 60
-
-        self._init, self._content, self._sn, self._last, self._next, self._dl = \
-            (self.r_value(i) for i in range(1, 7))
-        # self.init=r_value(1)
-        # self.content=r_value(2)
-        # self.sn=r_value(3)
-        # self.last=r_value(4)
-        # self.next=r_value(5)
-        # self.dl=r_value(6)
-
-        if self._sn == None:
-            self._sn = 0
-            self.w_value(3, self._sn)
-        if self._last == None:
-            self._last = self._init
-            self.w_value(4, self._last, self.DATE)
-        if self._next == None:
-            self._next = self._last + timedelta(future(self._sn))
-            self.w_value(5, self._next, self.DATE)
-        if self._dl == None:
-            self._dl = self._next + timedelta(future(self._sn + 1))
-        #     w_value(6, self.dl, DATE)
-
-    def __repr__(self):
-        return self._content
-
-    def verify(self, date):
-        # elapse = (date - self.last).days  # 今天 - 上次复习日期
-        # if elapse == interval[self.sn] or elapse % 30 == 0:
-        if date >= self._next and date <= self._dl:
-            return True
+def future(l):
+    out = []
+    for sn in l:
+        sn = int(sn)
+        if sn < inter_l:
+            out.append(interval[sn])
         else:
-            return False
-
-    @property
-    def today(self):
-        return self.verify(datetime.now())
-
-    @property
-    def tomorrow(self):
-        return self.verify(datetime.now() + timedelta(1))
+            out.append(60)
+    return [pd.Timedelta(days=each) for each in out]
 
 
-students = wb.get_sheet_names()
+def initial(s):
+    def check_n(col):
+        return pd.isnull(s[col]).any()
 
-print('今天是', date.today())
+    def write_n(col, value):
+        if check_n(col):
+            s.loc[pd.isnull(s[col]), col] = value
 
-for name in students:
-    sheet = wb.get_sheet_by_name(name)
+    # 初次背诵日期
+    write_n(init, now)
+    # 编号
+    write_n(count, 0)
+    # 上次
+    write_n(last, now)
+    # 下次时间
+    if check_n(next):
+        n = pd.isnull(s[next])
+        m = s.loc[n, :]
+        s.loc[n, next] = future(m[count]) + m[last]
+    # deadline时间
+    if check_n(dl):
+        n = pd.isnull(s[dl])
+        m = s.loc[n, :]
+        s.loc[n, dl] = future(m[count] + 1) + m[next]
 
-    tasks = {'今天': [], '明天': []}
-    today = []
-    tomorrow = []
 
-    i = 2
-    while i < sheet.max_row:
-        if sheet.cell(row=i, column=2).value is None:
-            tasks.update({'今天': today})
-            tasks.update({'明天': tomorrow})
+xls = pd.ExcelFile(dir)
+writer = pd.ExcelWriter(dir)
+
+for name in xls.sheet_names:
+    s = xls.parse(name)
+    initial(s)
+
+
+    def tasks(day, df):
+        l = len(df)
+        if l == 0:
+            print(day + '无复习任务。')
+            return 0
+        else:
+            print(day + '的复习任务为：')
+            return l
+
+
+    nexts = s.loc[:, next]
+    dls = s.loc[:, dl]
+    print('今天是', date.today(), '\n', '学生：', name)
+    # 明天任务
+    tomorrow = s[nexts == (now + pd.Timedelta(days=1))]
+    tasks('明天', tomorrow)
+    heads = ['高中单词']
+    l = list(tomorrow[content])
+    copy = ''
+    for head in heads:
+        out = ''
+        h_len = len(head)
+        for item in l:
+            if item.startswith(head):
+                out += item[h_len:] + '、'
+        if len(out) != 0:
+            copy += head + out
+    copy = copy[:-1]
+    print(copy)
+    pyperclip.copy(copy)
+    # 今天任务
+    today = s[(nexts <= (now)) & (dls >= now)]
+    today_no = tasks("今天", today)
+    if today_no:
+        today = pd.DataFrame({sn: pd.Series(np.arange(1, 1 + len(today)),
+                                            index=today.index)}
+                             ).join(today)
+        print(today[[sn, content]].to_string(index=False))
+
+        warn = s[(nexts < now) & (dls >= now)][dl]
+        if len(warn) != 0:
+            print('其中需要注意的任务为')
+            print(warn.to_string(index=False))
+
+        while 1:
+            type_in = input('请输入已完成的任务号，用空格间隔:')
+            if type_in == '':
+                break
+
+            type_in = [int(i) for i in type_in.split(' ')]
+            error = False
+            for each in type_in:
+                if not (today[sn].isin([2]).any()):
+                    print('输入错误，请重新输入')
+                    error = True
+                    break
+            if not error:
+                type_in = today[today[sn] == type_in].index
+                s.loc[type_in, count] += 1
+                s.loc[type_in, erase] = np.nan
+                initial(s)
+                break
+
+    while 1:
+        type_in = input('请输入今天新背的内容。参考头：' + ''.join(heads))
+        if type_in == '':
             break
-        else:
-            r = Record(name, i)
-            if r.today:  # 获取今天任务内容
-                today.append(r)
-            elif r.tomorrow:  # 获取今天任务内容
-                tomorrow.append(r)
-        i += 1
 
-    print('学生 ', name)
-    for k, v in tasks.items():
-        out=''
-        if len(v) == 0:
-            print(k + '无复习任务。')
-        else:
-            print(k + '的复习任务为：')
-        for item in v:
-            out+=item._content+' '
-        print(out)
-        pyperclip.copy(out)
+        s.loc[len(s.index), content] = type_in
+        initial(s)
+        break
 
-# wb.save(f_dir + f_name)
-
-# os.startfile(f_dir + f_name)
+    s.to_excel(writer, sheet_name=name)
+writer.save()
