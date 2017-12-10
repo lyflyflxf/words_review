@@ -76,7 +76,6 @@ for name in xls.sheet_names:
     s = xls.parse(name)
     initial(s)
 
-
     def tasks(day, df):
         l = len(df)
         if l == 0:
@@ -89,7 +88,7 @@ for name in xls.sheet_names:
 
     nexts = s.loc[:, next]
     dls = s.loc[:, dl]
-    print('今天是', date.today(), '\n', '学生：', name)
+    print('学生：', name)
     # 明天任务
     tomorrow = s[nexts == (now + pd.Timedelta(days=1))]
     tasks('明天', tomorrow)
@@ -116,7 +115,7 @@ for name in xls.sheet_names:
                              ).join(today)
         print(today[[sn, content]].to_string(index=False))
 
-        warn = s[(nexts < now) & (dls >= now)][dl]
+        warn = today[today[next]<now][[sn, dl]]
         if len(warn) != 0:
             print('其中需要注意的任务为')
             print(warn.to_string(index=False))
