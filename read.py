@@ -23,7 +23,7 @@ if __name__=="__main__":
 
     engine = pyttsx3.init()
     rate = engine.getProperty('rate')
-    engine.setProperty('rate', rate - 70)
+    engine.setProperty('rate', rate - 80)
     voices = engine.getProperty('voices')
     engine.setProperty('voice', voices[1].id)
 
