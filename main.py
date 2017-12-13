@@ -11,6 +11,7 @@ import pyperclip
 import pandas as pd
 from pdb import set_trace as st
 import numpy as np
+import os
 
 # review_day = [1, 3, 7, 14, 29, 59]
 interval = [1, 2, 4, 7, 15, 30]
@@ -18,7 +19,7 @@ inter_l = len(interval)
 
 # f_dir = r"E:\py\tools\s_plan\\"
 # f_name = 't.xlsx'
-dir = r"E:\py\tools\s_plan\t.xlsx"
+dir = os.getcwd()+r"\t.xlsx"
 
 init = '初次背诵日期'
 content = '内容'
