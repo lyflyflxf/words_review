@@ -57,7 +57,9 @@ def initial(s):
     def write_n(col, value):
         if check_n(col):
             s.loc[pd.isnull(s[col]), col] = value
-
+    #index
+    if pd.isnull(s.index).any():
+        s.index=range(len(s))
     # 初次背诵日期
     write_n(init, now)
     # 编号
@@ -84,6 +86,8 @@ def tasks(day, df):
         print(day + '的复习任务为：')
         return l
 
+def tag(col):
+    pass
 
 def today(name):
     if name not in names:
@@ -104,7 +108,7 @@ def today(name):
             for item in list(today):
                 if item.startswith(head):
                     read= item[h_len:]
-                    out.append()
+                    out.append(read)
             if len(out) != 0:
                 return head,out
     else:
@@ -115,7 +119,7 @@ def today(name):
 if __name__ == '__main__':
 
     for name in names:
-        s = xls.parse(name)
+        s = xls.parse(name,index_col=0)
         initial(s)
 
         nexts = s.loc[:, next]
