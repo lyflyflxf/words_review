@@ -9,7 +9,6 @@
 from datetime import *
 import pyperclip
 import pandas as pd
-from pdb import set_trace as st
 import numpy as np
 import os
 
@@ -31,17 +30,15 @@ sn = '序号'
 erase = [last, next, dl]
 heads = ['高中单词', '21天list']
 
-now = pd.Timestamp(date.today())#+pd.Timedelta(days=1)
+now = pd.Timestamp(date.today())
 xls = pd.ExcelFile(dir)
 writer = pd.ExcelWriter(dir)
-
 names = xls.sheet_names
 
 
-
-def future(l):
+def future(dates):
     out = []
-    for sn in l:
+    for sn in dates:
         sn = int(sn)
         if sn < inter_l:
             out.append(interval[sn])
@@ -51,55 +48,52 @@ def future(l):
 
 
 def initial(s):
-    def check_n(col):
-        return pd.isnull(s[col]).any()
+    def null_bools(col):
+        return pd.isnull(s[col])
 
-    def write_n(col, value):
-        if check_n(col):
-            s.loc[pd.isnull(s[col]), col] = value
-    #index
+    def copy(col, value):
+        if null_bools(col).any():
+            s.loc[null_bools(col), col] = value
+
+    def sum_up(col, plus=0):
+        def cells(row, col):
+            return s.loc[null_bools(row), col]
+
+        copy(col,
+             future(cells(col, count) + plus) + cells(col, last))
+
+    # index
     if pd.isnull(s.index).any():
-        s.index=range(len(s))
+        s.index = range(len(s))
     # 初次背诵日期
-    write_n(init, now)
+    copy(init, now)
     # 编号
-    write_n(count, 0)
+    copy(count, 0)
     # 上次
-    write_n(last, now)
+    copy(last, now)
     # 下次时间
-    if check_n(next):
-        n = pd.isnull(s[next])
-        m = s.loc[n, :]
-        s.loc[n, next] = future(m[count]) + m[last]
+    sum_up(next, 0)
     # deadline时间
-    if check_n(dl):
-        n = pd.isnull(s[dl])
-        m = s.loc[n, :]
-        s.loc[n, dl] = future(m[count] + 1) + m[next]
+    sum_up(dl, 1)
+
 
 def tasks(day, df):
-    l = len(df)
-    if l == 0:
+    length = len(df)
+    if length == 0:
         print(day + '无复习任务。')
         return 0
     else:
         print(day + '的复习任务为：')
-        return l
+        return length
 
-def tag(col):
-    pass
 
 def today(name):
     if name not in names:
         return 'error'
-
     s = xls.parse(name)
     initial(s)
-    nexts = s.loc[:, next]
-    dls = s.loc[:, dl]
-
+    nexts, dls = s.loc[:, next], s.loc[:, dl]
     today = s[(nexts <= (now)) & (dls >= now)][content]
-
     today_no = tasks("今天", today)
     if today_no:
         for head in heads:
@@ -107,19 +101,17 @@ def today(name):
             h_len = len(head)
             for item in list(today):
                 if item.startswith(head):
-                    read= item[h_len:]
+                    read = item[h_len:]
                     out.append(read)
             if len(out) != 0:
-                return head,out
+                return head, out
     else:
         return None
 
 
-
 if __name__ == '__main__':
-
     for name in names:
-        s = xls.parse(name,index_col=0)
+        s = xls.parse(name, index_col=0)
         initial(s)
 
         nexts = s.loc[:, next]
@@ -128,13 +120,13 @@ if __name__ == '__main__':
         # 明天任务
         tomorrow = s[nexts == (now + pd.Timedelta(days=1))]
         tasks('明天', tomorrow)
-        l = list(tomorrow[content])
+        tmr_tasks = list(tomorrow[content])
 
         copy = ''
         for head in heads:
             out = ''
             h_len = len(head)
-            for item in l:
+            for item in tmr_tasks:
                 if item.startswith(head):
                     out += item[h_len:] + '、'
             if len(out) != 0:
@@ -143,7 +135,7 @@ if __name__ == '__main__':
         print(copy)
         pyperclip.copy(copy)
         # 今天任务
-        today = s[(nexts <= (now)) & (dls >= now)]
+        today = s[(nexts <= now) & (dls >= now)]
         today_no = tasks("今天", today)
         if today_no:
             today = pd.DataFrame({sn: pd.Series(np.arange(1, 1 + len(today)),
@@ -151,7 +143,7 @@ if __name__ == '__main__':
                                  ).join(today)
             print(today[[sn, content]].to_string(index=False))
 
-            warn = today[today[next]<now][[sn, dl]]
+            warn = today[today[next] < now][[sn, dl]]
             if len(warn) != 0:
                 print('其中需要注意的任务为')
                 print(warn.to_string(index=False))
@@ -160,7 +152,6 @@ if __name__ == '__main__':
                 type_in = input('请输入已完成任务的序号，用空格间隔:')
                 if type_in == '':
                     break
-
                 try:
                     type_in = [int(i) for i in type_in.split(' ')]
                 except ValueError:
@@ -189,4 +180,4 @@ if __name__ == '__main__':
             break
 
         s.to_excel(writer, sheet_name=name)
-    writer.save()
+    # writer.save()
