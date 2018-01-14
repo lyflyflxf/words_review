@@ -10,6 +10,7 @@ from datetime import *
 import pyperclip
 import pandas as pd
 import numpy as np
+from pdb import set_trace
 import os
 
 # review_day = [1, 3, 7, 14, 29, 59]
@@ -18,7 +19,7 @@ inter_l = len(interval)
 
 # f_dir = r"E:\py\tools\s_plan\\"
 # f_name = 't.xlsx'
-dir = os.getcwd()+r"\t.xlsx"
+dir = os.getcwd() + r"\t.xlsx"
 
 init = '初次背诵日期'
 content = '内容'
@@ -35,18 +36,6 @@ xls = pd.ExcelFile(dir)
 writer = pd.ExcelWriter(dir)
 names = xls.sheet_names
 
-
-def future(dates):
-    out = []
-    for sn in dates:
-        sn = int(sn)
-        if sn < inter_l:
-            out.append(interval[sn])
-        else:
-            out.append(60)
-    return [pd.Timedelta(days=each) for each in out]
-
-
 def initial(s):
     def null_bools(col):
         return pd.isnull(s[col])
@@ -56,11 +45,22 @@ def initial(s):
             s.loc[null_bools(col), col] = value
 
     def sum_up(col, plus=0):
-        def cells(row, col):
-            return s.loc[null_bools(row), col]
+        def cells(col2,plus):
+            array = s.loc[null_bools(col), :][col2]
+            if plus:
+                return array + 1
+            else:
+                return array
+
+        def future(date):
+            if date < inter_l:
+                out = interval[date]
+            else:
+                out = 60
+            return pd.Timedelta(days=out)
 
         copy(col,
-             future(cells(col, count) + plus) + cells(col, last))
+             cells(count,plus).apply(future) + cells(last,0))
 
     # index
     if pd.isnull(s.index).any():
@@ -72,56 +72,52 @@ def initial(s):
     # 上次
     copy(last, now)
     # 下次时间
-    sum_up(next, 0)
+    sum_up(next)
     # deadline时间
-    sum_up(dl, 1)
+    sum_up(dl, plus=1)
 
 
-def tasks(day, df):
-    length = len(df)
-    if length == 0:
-        print(day + '无复习任务。')
-        return 0
-    else:
-        print(day + '的复习任务为：')
-        return length
-
-
-def today(name):
-    if name not in names:
-        return 'error'
-    s = xls.parse(name)
-    initial(s)
-    nexts, dls = s.loc[:, next], s.loc[:, dl]
-    today = s[(nexts <= (now)) & (dls >= now)][content]
-    today_no = tasks("今天", today)
-    if today_no:
-        for head in heads:
-            out = []
-            h_len = len(head)
-            for item in list(today):
-                if item.startswith(head):
-                    read = item[h_len:]
-                    out.append(read)
-            if len(out) != 0:
-                return head, out
-    else:
-        return None
-
-
+# def today(name):
+#     if name not in names:
+#         return 'error'
+#     s = xls.parse(name)
+#     initial(s)
+#     nexts, dls = s.loc[:, next], s.loc[:, dl]
+#     today = s[(nexts <= (now)) & (dls >= now)][content]
+#     today_no = tasks("今天", today)
+#     if today_no:
+#         for head in heads:
+#             out = []
+#             h_len = len(head)
+#             for item in list(today):
+#                 if item.startswith(head):
+#                     read = item[h_len:]
+#                     out.append(read)
+#             if len(out) != 0:
+#                 return head, out
+#     else:
+#         return None
 if __name__ == '__main__':
+    def tasks(day, df):
+        exist = df.empty
+        if exist:
+            print(day + '无复习任务。')
+        else:
+            print(day + '的复习任务为：')
+        return exist
+
+
     for name in names:
         s = xls.parse(name, index_col=0)
+        print('学生：', name)
         initial(s)
 
-        nexts = s.loc[:, next]
-        dls = s.loc[:, dl]
-        print('学生：', name)
+        nexts, dls = s.loc[:, next], s.loc[:, dl]
         # 明天任务
         tomorrow = s[nexts == (now + pd.Timedelta(days=1))]
         tasks('明天', tomorrow)
         tmr_tasks = list(tomorrow[content])
-
+        # 生成汇报版明天任务
         copy = ''
         for head in heads:
             out = ''
@@ -170,14 +166,14 @@ if __name__ == '__main__':
                     initial(s)
                     break
 
-        while 1:
-            type_in = input('请输入今天新背的内容。参考头：' + ''.join(heads))
-            if type_in == '':
+            while 1:
+                type_in = input('请输入今天新背的内容。参考头：' + ''.join(heads))
+                if type_in == '':
+                    break
+
+                s.loc[len(s.index), content] = type_in
+                initial(s)
                 break
 
-            s.loc[len(s.index), content] = type_in
-            initial(s)
-            break
-
         s.to_excel(writer, sheet_name=name)
-    # writer.save()
+    writer.save()
