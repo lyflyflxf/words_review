@@ -36,6 +36,7 @@ xls = pd.ExcelFile(dir)
 writer = pd.ExcelWriter(dir)
 names = xls.sheet_names
 
+
 def initial(s):
     def null_bools(col):
         return pd.isnull(s[col])
@@ -45,22 +46,22 @@ def initial(s):
             s.loc[null_bools(col), col] = value
 
     def sum_up(col, plus=0):
-        def cells(col2,plus):
+        def cells(col2, plus):
             array = s.loc[null_bools(col), :][col2]
             if plus:
                 return array + 1
             else:
                 return array
 
-        def future(date):
-            if date < inter_l:
-                out = interval[date]
+        def future(sn):
+            if sn < inter_l:
+                out = interval[sn]
             else:
                 out = 60
             return pd.Timedelta(days=out)
 
         copy(col,
-             cells(count,plus).apply(future) + cells(last,0))
+             cells(count, plus).apply(future) + cells(last, 0))
 
     # index
     if pd.isnull(s.index).any():
@@ -132,8 +133,7 @@ if __name__ == '__main__':
         pyperclip.copy(copy)
         # 今天任务
         today = s[(nexts <= now) & (dls >= now)]
-        today_no = tasks("今天", today)
-        if today_no:
+        if tasks("今天", today):
             today = pd.DataFrame({sn: pd.Series(np.arange(1, 1 + len(today)),
                                                 index=today.index)}
                                  ).join(today)
